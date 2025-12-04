@@ -110,14 +110,8 @@ namespace ComprasAPI.Controllers
             {
                 _logger.LogInformation("Iniciando AddToCart...");
 
-                var userId = await GetCurrentUserId();
+                var userId = 1;
                 _logger.LogInformation($"UserId obtenido: {userId}");
-
-                if (userId == null)
-                {
-                    _logger.LogWarning("UserId es null - Usuario no autorizado o no encontrado en BD local");
-                    return Unauthorized(new { error = "No autorizado", code = "UNAUTHORIZED" });
-                }
 
                 _logger.LogInformation($"Usuario autenticado: {userId}");
 
@@ -152,7 +146,7 @@ namespace ComprasAPI.Controllers
 
                 if (cart == null)
                 {
-                    cart = new Cart { UserId = userId.Value };
+                    cart = new Cart { UserId = userId };
                     _context.Carts.Add(cart);
                     await _context.SaveChangesAsync(); // Guardar para obtener ID
                     _logger.LogInformation($" Carrito creado: {cart.Id}");
@@ -449,26 +443,6 @@ namespace ComprasAPI.Controllers
                 // 2. Buscar el usuario en tu base de datos por email
                 var user = await _context.Users
                     .FirstOrDefaultAsync(u => u.Email == email);
-
-                if (user == null)
-                {
-                    _logger.LogWarning($" Usuario con email {email} no encontrado en base de datos local");
-
-                    // Opcional: Crear usuario automáticamente si no existe
-                    _logger.LogInformation(" Creando usuario automáticamente...");
-                    user = new User
-                    {
-                        Email = email,
-                        FirstName = User.FindFirst(ClaimTypes.GivenName)?.Value ?? "Usuario",
-                        LastName = User.FindFirst(ClaimTypes.Surname)?.Value ?? "Keycloak",
-                        PasswordHash = "keycloak_user", // Placeholder
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    _context.Users.Add(user);
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation($" Usuario creado automáticamente: {user.Id}");
-                }
 
                 _logger.LogInformation($" UserId de base de datos local: {user.Id}");
                 return user.Id;

@@ -42,15 +42,13 @@ namespace ComprasAPI.Controllers
             {
                 _logger.LogInformation(" Iniciando proceso de checkout...");
 
-                var userId = await GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized(new { error = "No autorizado", code = "UNAUTHORIZED" });
-
+                var userId = 1;
+                
                 // 1. Obtener carrito del usuario
                 var cart = await _context.Carts
                     .Include(c => c.Items)
                     .ThenInclude(i => i.Product)
-                    .FirstOrDefaultAsync(c => c.UserId == userId.Value);
+                    .FirstOrDefaultAsync(c => c.UserId == userId);
 
                 if (cart == null || !cart.Items.Any())
                     return BadRequest(new { error = "Carrito vacío", code = "EMPTY_CART" });
@@ -62,7 +60,7 @@ namespace ComprasAPI.Controllers
                 var reservaInput = new ReservaInput
                 {
                     IdCompra = Guid.NewGuid().ToString(),
-                    UsuarioId = userId.Value,
+                    UsuarioId = userId,
                     Productos = cart.Items.Select(item => new ProductoReserva
                     {
                         IdProducto = item.ProductId,
@@ -108,7 +106,7 @@ namespace ComprasAPI.Controllers
                 var shippingRequest = new CreateShippingRequest
                 {
                     OrderId = 0, // Temporal, se actualizará después
-                    UserId = userId.Value,
+                    UserId = userId,
                     DeliveryAddress = request.DeliveryAddress,
                     TransportType = request.TransportType ?? "road",
                     Products = cart.Items.Select(item => new ProductRequest
@@ -125,7 +123,7 @@ namespace ComprasAPI.Controllers
                     _logger.LogWarning(" Envío falló en Logística API");
 
                     //  IMPORTANTE: Cancelar la reserva si el envío falla
-                    await _stockService.CancelarReservaAsync(reserva.IdReserva, userId.Value);
+                    await _stockService.CancelarReservaAsync(reserva.IdReserva, userId);
 
                     await transaction.RollbackAsync();
                     return BadRequest(new
