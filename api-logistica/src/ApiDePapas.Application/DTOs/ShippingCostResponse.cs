@@ -20,6 +20,10 @@ namespace ApiDePapas.Application.DTOs
 
         [property: JsonPropertyName("products")]
         [Required]
-        List<ProductOutput> products
+        List<ProductOutput> products,
+
+        [property: JsonPropertyName("estimated_delivery_at")]
+        [Required]
+        DateTime estimated_delivery_at
     );
 }

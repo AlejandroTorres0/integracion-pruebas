@@ -5,6 +5,6 @@ namespace ApiDePapas.Application.Interfaces
 {
     public interface ICalculateCost
     {
-        Task<ShippingCostResponse> CalculateShippingCostAsync(ShippingCostRequest request);
+        Task<ShippingCostResponse> CalculateShippingCostAsync(CalculateCostRequest request);
     }
 }

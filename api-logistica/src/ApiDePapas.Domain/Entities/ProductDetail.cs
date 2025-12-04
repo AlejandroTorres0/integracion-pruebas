@@ -1,10 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using System.Numerics;
-
-//Hay que cambiar la estructura para que sea acorde a lo que nos da stock. address, etc.
 
 namespace ApiDePapas.Domain.Entities
 {
+    // Detalle de producto tal como nos lo devuelve el módulo de Stock
     public class ProductDetail
     {
         [Required]
@@ -21,5 +19,9 @@ namespace ApiDePapas.Domain.Entities
 
         [Required]
         public float height { get; set; }
+
+        // Código postal del depósito/almacén donde está el producto (ORIGEN del envío)
+        // Puede ser null si Stock aún no lo tiene; en ese caso usamos DEFAULT_ORIGIN_CPA.
+        public string? warehouse_postal_code { get; set; }
     }
 }

@@ -8,5 +8,8 @@ namespace ComprasAPI.Services
         Task<CreateShippingResponse> CrearEnvioAsync(CreateShippingRequest request);
         Task<ShippingDetail> ObtenerSeguimientoAsync(int shippingId);
         Task<List<TransportMethod>> ObtenerMetodosTransporteAsync();
+
     }
+
+
 }

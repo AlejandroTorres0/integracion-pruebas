@@ -31,6 +31,8 @@ namespace ComprasAPI.Controllers
             _logger = logger;
         }
 
+        /*
+
         // POST: api/shopcart/checkout
         [HttpPost("checkout")]
         [Authorize]
@@ -171,6 +173,8 @@ namespace ComprasAPI.Controllers
             }
         
         }
+
+        */
 
         // GET: api/shopcart/transport-methods
         [HttpGet("transport-methods")]

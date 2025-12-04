@@ -1,0 +1,109 @@
+<!--
+<div style="background: red; color: white; padding: 10px; margin: 10px;">
+  <h3>🚨 DEBUG ZONE - ProductsListComponent</h3>
+  <button (click)="testDebug()" class="btn btn-warning">
+    Probar Debug Directo
+  </button>
+  <p>Productos cargados: {{ filteredProducts.length }}</p>
+</div>-->
+
+<!-- Barra de búsqueda -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="input-group">
+      <input
+        type="text"
+        class="form-control"
+        placeholder="Buscar productos..."
+        [(ngModel)]="searchTerm"
+        (keyup.enter)="searchProducts()">
+      <button class="btn btn-primary" (click)="searchProducts()">
+        Buscar
+      </button>
+      <button class="btn btn-outline-secondary" (click)="loadProducts()">
+        🔄 Actualizar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div class="row" *ngIf="loading">
+  <div class="col text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando productos...</span>
+    </div>
+    <p class="mt-2">Cargando productos desde Stock API...</p>
+  </div>
+</div>
+
+<!-- Lista de productos -->
+<div class="row" *ngIf="!loading">
+  <div class="col">
+    <h3>Productos Disponibles ({{filteredProducts.length}})</h3>
+
+    <div *ngIf="filteredProducts.length === 0 && !loading" class="alert alert-warning">
+      No se encontraron productos.
+    </div>
+
+    <div class="row">
+      <div class="col-md-4 mb-4" *ngFor="let product of filteredProducts">
+        <div class="card h-100">
+          <!-- Imagen del producto -->
+          <img
+            [src]="getProductImage(product)"
+            class="card-img-top"
+            [alt]="product.nombre"
+            style="height: 200px; object-fit: cover;"
+            (error)="onImageError($event)">
+
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">{{product.nombre}}</h5>
+            <p class="card-text flex-grow-1">{{product.descripcion}}</p>
+
+            <!-- Categorías -->
+            <div class="mb-2">
+              <span
+                *ngFor="let categoria of product.categorias"
+                class="badge bg-secondary me-1">
+                {{categoria.nombre}}
+              </span>
+            </div>
+
+            <!-- Información del producto -->
+            <div class="product-info mb-2">
+              <small class="text-muted d-block">
+                📦 Stock: {{product.stockDisponible}}
+              </small>
+              <small class="text-muted d-block">
+                ⚖️ Peso: {{product.pesoKg}} kg
+              </small>
+              <small class="text-muted d-block">
+                📏 Dimensiones: {{product.dimensiones?.largoCm}}x{{product.dimensiones?.anchoCm}}x{{product.dimensiones?.altoCm}} cm
+              </small>
+            </div>
+
+            <div class="mt-auto">
+              <h4 class="text-primary mb-3">{{product.precio}}</h4>
+
+              <button
+                class="btn btn-success w-100"
+                (click)="addToCart(product)"
+                [disabled]="product.stockDisponible === 0 || isAddingToCart">
+                
+                <span *ngIf="isAddingToCart" class="d-flex align-items-center justify-content-center">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Agregando...
+                </span>
+                
+                <span *ngIf="!isAddingToCart">
+                  {{product.stockDisponible === 0 ? 'SIN STOCK' : '🛒 Agregar al Carrito'}}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

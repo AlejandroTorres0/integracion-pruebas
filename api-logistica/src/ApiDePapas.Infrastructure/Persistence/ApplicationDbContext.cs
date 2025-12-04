@@ -23,34 +23,34 @@ namespace ApiDePapas.Infrastructure.Persistence
             // 2. Definición de Claves Primarias
             modelBuilder.Entity<ShippingDetail>().HasKey(s => s.shipping_id);
             modelBuilder.Entity<TransportMethod>().HasKey(t => t.transport_id);
-            modelBuilder.Entity<DistributionCenter>().HasKey(dc => dc.distribution_center_id); 
+            modelBuilder.Entity<DistributionCenter>().HasKey(dc => dc.distribution_center_id);
             modelBuilder.Entity<Travel>().HasKey(t => t.travel_id);
             modelBuilder.Entity<Address>().HasKey(a => a.address_id); // PK de Address
-            modelBuilder.Entity<Locality>().HasKey(l => new {l.postal_code, l.locality_name}); // Clave Compuesta
-            
+            modelBuilder.Entity<Locality>().HasKey(l => new { l.postal_code, l.locality_name }); // Clave Compuesta
+
             // 3. Mapeo de Relaciones de Entidades
-            
+
             // A. Relación ShippingDetail (N) a Travel (1)
             modelBuilder.Entity<ShippingDetail>()
-                .HasOne(s => s.Travel) 
+                .HasOne(s => s.Travel)
                 .WithMany(t => t.Shippings)
                 .HasForeignKey(s => s.travel_id)
                 .IsRequired();
-            
+
             // B. Relación Travel (N) a TransportMethod (1)
             modelBuilder.Entity<Travel>()
-                .HasOne(t => t.TransportMethod) 
+                .HasOne(t => t.TransportMethod)
                 .WithMany()
                 .HasForeignKey(t => t.transport_method_id)
                 .IsRequired();
-            
+
             // C. Relación Travel (N) a DistributionCenter (1)
             modelBuilder.Entity<Travel>()
                 .HasOne(t => t.DistributionCenter)
                 .WithMany()
                 .HasForeignKey(t => t.distribution_center_id)
                 .IsRequired();
-            
+
             // D. Relación ShippingDetail (N) a Address (1) - SOLO ENTREGA
             modelBuilder.Entity<ShippingDetail>()
                 .HasOne(s => s.DeliveryAddress) // Propiedad de navegación 'DeliveryAddress'
@@ -58,7 +58,7 @@ namespace ApiDePapas.Infrastructure.Persistence
                 .HasForeignKey(s => s.delivery_address_id) // Clave foránea en ShippingDetail
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired();
-            
+
             // E. Relación Address (N) a Locality (1)
             modelBuilder.Entity<Address>()
                 .HasOne(a => a.Locality) // Address tiene UNA Locality
@@ -67,15 +67,15 @@ namespace ApiDePapas.Infrastructure.Persistence
                 .IsRequired();
 
             // 4. Mapeo de Propiedades Secundarias
-            
+
             // A. Colecciones (Tablas Satélite)
             // --- MODIFICADO --- (Añadido HasIndex)
             modelBuilder.Entity<ShippingDetail>().OwnsMany(s => s.products, owned =>
             {
-                owned.ToTable("ProductQty"); 
-                owned.Property<int>("RowId").ValueGeneratedOnAdd(); 
-                owned.HasKey("RowId", "ShippingDetailshipping_id"); 
-            
+                owned.ToTable("ProductQty");
+                owned.Property<int>("RowId").ValueGeneratedOnAdd();
+                owned.HasKey("RowId", "ShippingDetailshipping_id");
+
                 owned.WithOwner()
                      .HasForeignKey("ShippingDetailshipping_id");
 
@@ -86,14 +86,14 @@ namespace ApiDePapas.Infrastructure.Persistence
             });
 
             // --- MODIFICADO --- (Añadido HasIndex)
-            modelBuilder.Entity<ShippingDetail>().OwnsMany(s => s.logs, owned => 
+            modelBuilder.Entity<ShippingDetail>().OwnsMany(s => s.logs, owned =>
             {
                 // --- NUEVO ---
                 // Asumimos que la tabla se llama 'ShippingLog'
                 // y que la FK se llama 'ShippingDetailshipping_id'
                 // ¡Ajusta esto si tus logs se configuran diferente!
                 owned.ToTable("ShippingLog");
-                
+
                 // Indexamos la FK para acelerar la carga de logs
                 owned.HasIndex("ShippingDetailshipping_id")
                      .HasDatabaseName("IX_ShippingLog_ShippingDetailshipping_id");
@@ -111,8 +111,8 @@ namespace ApiDePapas.Infrastructure.Persistence
             modelBuilder.Entity<TransportMethod>()
                     .Property(t => t.transport_type)
                     .HasConversion<string>();
-            
-            
+
+
             // --- INICIO DE LA SECCIÓN COMPLETAMENTE NUEVA ---
 
             // 6. Definición de Índices para Optimización de Rendimiento
@@ -124,7 +124,7 @@ namespace ApiDePapas.Infrastructure.Persistence
                 // Para acelerar JOINs
                 entity.HasIndex(s => s.travel_id)
                       .HasDatabaseName("IX_Shippings_travel_id");
-                
+
                 entity.HasIndex(s => s.delivery_address_id)
                       .HasDatabaseName("IX_Shippings_delivery_address_id");
 
@@ -132,7 +132,7 @@ namespace ApiDePapas.Infrastructure.Persistence
                 // ¡Borra o edita estas líneas si tus propiedades se llaman diferente!
                 entity.HasIndex(s => s.status)
                       .HasDatabaseName("IX_Shippings_status");
-                
+
                 entity.HasIndex(s => s.created_at)
                       .HasDatabaseName("IX_Shippings_created_at");
             });
@@ -171,7 +171,7 @@ namespace ApiDePapas.Infrastructure.Persistence
                 entity.HasIndex(l => l.locality_name)
                       .HasDatabaseName("IX_Localities_locality_name");
             });
-            
+
             // --- FIN DE LA SECCIÓN COMPLETAMENTE NUEVA ---
 
 

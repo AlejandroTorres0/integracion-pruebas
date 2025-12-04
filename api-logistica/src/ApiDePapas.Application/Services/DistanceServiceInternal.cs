@@ -1,18 +1,11 @@
 using System;
-using System.Globalization;
 using System.Collections.Generic;
-
+using System.Linq;
+using System.Threading.Tasks; // Necesario para Task
 using ApiDePapas.Application.Interfaces;
 using ApiDePapas.Domain.Entities;
 using ApiDePapas.Domain.Repositories;
-
-// Es una mejor aproximación que DistanceServiceInMemory. Sirve para
-// calcular distancias entre departamentos en lugar de provincias, por lo
-// que usa los 5 primeros dígitos del código postal y promedia las coordenadas
-// geográficas de las localidades con ese código postal.
-
-// Puede utilizarse una API externa en el futuro si se quiere precisión a nivel
-// calle/dirección.
+using System.Text.RegularExpressions; // Para limpiar el CP
 
 namespace ApiDePapas.Application.Services
 {
@@ -20,36 +13,51 @@ namespace ApiDePapas.Application.Services
     {
         private readonly ILocalityRepository _locality_repository;
 
-        public DistanceServiceInternal(
-            ILocalityRepository localityRepository)
+        public DistanceServiceInternal(ILocalityRepository localityRepository)
         {
             _locality_repository = localityRepository;
+        }
+
+        // Método auxiliar para limpiar el CP
+        // Transforma "H3500AAA" -> "H3500" (Conserva la letra de provincia y los números)
+        private string CleanPostalCode(string cpa)
+        {
+            if (string.IsNullOrEmpty(cpa)) return "";
+
+            // Regex: ^[A-Za-z] busca una letra al inicio
+            //        \d+      busca los números que le siguen
+            // Esto capturará "H3500" e ignorará "AAA" del final.
+            var match = Regex.Match(cpa, @"^[A-Za-z]\d+");
+
+            if (match.Success)
+            {
+                return match.Value.ToUpper(); // Retorna H3500 en mayúsculas
+            }
+            return Regex.Replace(cpa, @"\s+", "").ToUpper(); // Si no coincide, retorna el CP sin espacios en mayúsculas
         }
 
         public (double lat, double lon) GetAverageCoordinates(List<(double, double)> points)
         {
             if (points == null || !points.Any())
             {
-                throw new ArgumentException("La lista de puntos no puede ser nula o vacía.");
+                // Retornar 0,0 en lugar de lanzar error para ser más resiliente
+                return (0, 0);
             }
 
             double x = 0.0;
             double y = 0.0;
             double z = 0.0;
-
             int count = 0;
 
             foreach (var (latDeg, lonDeg) in points)
             {
                 double latRad = DegreesToRadians(latDeg);
                 double lonRad = DegreesToRadians(lonDeg);
-
                 double cosLat = Math.Cos(latRad);
 
                 x += cosLat * Math.Cos(lonRad);
                 y += cosLat * Math.Sin(lonRad);
                 z += Math.Sin(latRad);
-
                 count++;
             }
 
@@ -66,10 +74,28 @@ namespace ApiDePapas.Application.Services
 
         public async Task<double> GetDistanceKm(string originCpa, string destinationCpa)
         {
-            List<Locality> possibleOriginLocalities = _locality_repository.GetByPostalCodeAsync(originCpa).Result;
-            List<Locality> possibleDestinationLocalities = _locality_repository.GetByPostalCodeAsync(destinationCpa).Result;
+            // 1. Limpiamos los códigos postales para buscar solo los números (ej. "3500")
+            string cleanOrigin = CleanPostalCode(originCpa);
+            string cleanDest = CleanPostalCode(destinationCpa);
 
-            if (!possibleOriginLocalities.Any() || !possibleDestinationLocalities.Any()) { return 300.0; } // fallback neutro
+            // 2. CORRECCIÓN CLAVE: Usamos 'await' en lugar de '.Result'
+            List<Locality> possibleOriginLocalities = await _locality_repository.GetByPostalCodeAsync(cleanOrigin);
+            List<Locality> possibleDestinationLocalities = await _locality_repository.GetByPostalCodeAsync(cleanDest);
+
+            // 3. Verificamos si encontramos localidades
+            if (!possibleOriginLocalities.Any() || !possibleDestinationLocalities.Any()) 
+            { 
+                // Si no encontramos nada, intentamos buscar sin limpiar (por si la BD sí tiene letras)
+                if (!possibleOriginLocalities.Any()) 
+                    possibleOriginLocalities = await _locality_repository.GetByPostalCodeAsync(originCpa);
+                
+                if (!possibleDestinationLocalities.Any())
+                    possibleDestinationLocalities = await _locality_repository.GetByPostalCodeAsync(destinationCpa);
+
+                // Si seguimos sin encontrar, devolvemos fallback
+                if (!possibleOriginLocalities.Any() || !possibleDestinationLocalities.Any())
+                    return 300.0; 
+            }
 
             List<(double lat, double lon)> possibleOriginCoords = possibleOriginLocalities
                 .Select(l => ((double)l.lat, (double)l.lon))
@@ -79,8 +105,8 @@ namespace ApiDePapas.Application.Services
                 .Select(l => ((double)l.lat, (double)l.lon))
                 .ToList();
 
-            (double lat, double lon) originCentroid = GetAverageCoordinates(possibleOriginCoords);
-            (double lat, double lon) destinationCentroid = GetAverageCoordinates(possibleDestinationCoords);
+            var originCentroid = GetAverageCoordinates(possibleOriginCoords);
+            var destinationCentroid = GetAverageCoordinates(possibleDestinationCoords);
 
             return HaversineKm(originCentroid.lat, originCentroid.lon, destinationCentroid.lat, destinationCentroid.lon);
         }

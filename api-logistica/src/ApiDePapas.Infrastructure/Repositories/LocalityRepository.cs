@@ -22,8 +22,8 @@ namespace ApiDePapas.Infrastructure.Repositories
         public async Task<Locality?> GetByCompositeKeyAsync(string postalCode, string localityName)
         {
             return await _context.Localities
-                                 .FirstOrDefaultAsync(l => 
-                                     l.postal_code == postalCode && 
+                                 .FirstOrDefaultAsync(l =>
+                                     l.postal_code == postalCode &&
                                      l.locality_name == localityName);
         }
 
@@ -44,7 +44,7 @@ namespace ApiDePapas.Infrastructure.Repositories
                 q = q.Where(l => l.state_name.ToUpper() == state.ToUpper());
 
             if (!string.IsNullOrWhiteSpace(localityName))
-                q = q.Where(l => l.locality_name.ToUpper() == localityName.ToUpper());
+                q = q.Where(l => l.locality_name.ToUpper().Contains(localityName.ToUpper()));
 
             if (!string.IsNullOrWhiteSpace(postalCode))
                 q = q.Where(l => l.postal_code == postalCode);
@@ -66,8 +66,11 @@ namespace ApiDePapas.Infrastructure.Repositories
                                  .ToListAsync();
         }
 
-        // --- Implementaciones de IGenericRepository<Locality> se mantienen (como en tu código) ---
-        public Task<IEnumerable<Locality>> GetAllAsync() => throw new NotImplementedException();
+        // --- Implementaciones de IGenericRepository<Locality> van aquí ---
+        public async Task<IEnumerable<Locality>> GetAllAsync()
+        {
+            return await _context.Localities.ToListAsync();
+        }
         public Task<Locality?> GetByIdAsync(int id) => throw new NotImplementedException();
         public Task AddAsync(Locality entity) => throw new NotImplementedException();
         public void Update(Locality entity) => throw new NotImplementedException();

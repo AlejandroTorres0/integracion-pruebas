@@ -1,213 +1,31 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
 import { AuthService, RegisterRequest } from '../../../services/auth';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule],
-  template: `
-    <div class="container mt-5">
-      <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-          <div class="card shadow">
-            <div class="card-body p-4">
-              <h2 class="card-title text-center mb-4">Registro de Usuario</h2>
-              
-              <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-                <div class="row">
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label for="firstName" class="form-label">Nombre</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        id="firstName"
-                        formControlName="firstName"
-                        [class.is-invalid]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched"
-                        placeholder="Tu nombre"
-                      >
-                      <div class="invalid-feedback" *ngIf="registerForm.get('firstName')?.errors?.['required']">
-                        El nombre es requerido
-                      </div>
-                      <div class="invalid-feedback" *ngIf="registerForm.get('firstName')?.errors?.['minlength']">
-                        Mínimo 2 caracteres
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label for="lastName" class="form-label">Apellido</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        id="lastName"
-                        formControlName="lastName"
-                        [class.is-invalid]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched"
-                        placeholder="Tu apellido"
-                      >
-                      <div class="invalid-feedback" *ngIf="registerForm.get('lastName')?.errors?.['required']">
-                        El apellido es requerido
-                      </div>
-                      <div class="invalid-feedback" *ngIf="registerForm.get('lastName')?.errors?.['minlength']">
-                        Mínimo 2 caracteres
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mb-3">
-                  <label for="email" class="form-label">Email</label>
-                  <input
-                    type="email"
-                    class="form-control"
-                    id="email"
-                    formControlName="email"
-                    [class.is-invalid]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
-                    placeholder="tu@email.com"
-                  >
-                  <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['required']">
-                    El email es requerido
-                  </div>
-                  <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['email']">
-                    Formato de email inválido
-                  </div>
-                </div>
-
-                <div class="row">
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label for="password" class="form-label">Contraseña</label>
-                      <input
-                        type="password"
-                        class="form-control"
-                        id="password"
-                        formControlName="password"
-                        [class.is-invalid]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched"
-                        placeholder="Mínimo 6 caracteres"
-                      >
-                      <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['required']">
-                        La contraseña es requerida
-                      </div>
-                      <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['minlength']">
-                        Mínimo 6 caracteres
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label for="repeatPassword" class="form-label">Repetir Contraseña</label>
-                      <input
-                        type="password"
-                        class="form-control"
-                        id="repeatPassword"
-                        formControlName="repeatPassword"
-                        [class.is-invalid]="registerForm.get('repeatPassword')?.invalid && registerForm.get('repeatPassword')?.touched"
-                        placeholder="Repite tu contraseña"
-                      >
-                      <div class="invalid-feedback" *ngIf="registerForm.get('repeatPassword')?.errors?.['required']">
-                        Debes repetir la contraseña
-                      </div>
-                      <div class="invalid-feedback" *ngIf="registerForm.get('repeatPassword')?.errors?.['passwordMismatch']">
-                        Las contraseñas no coinciden
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="d-grid gap-2">
-                  <button
-                    type="submit"
-                    class="btn btn-primary"
-                    [disabled]="registerForm.invalid || loading"
-                  >
-                    <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
-                    {{ loading ? 'Registrando...' : 'Registrarse' }}
-                  </button>
-                </div>
-
-                <div class="text-center mt-3">
-                  <a routerLink="/login" class="text-decoration-none">¿Ya tienes cuenta? Inicia Sesión</a>
-                </div>
-              </form>
-
-              <div *ngIf="errorMessage" class="alert alert-danger mt-3" role="alert">
-                {{ errorMessage }}
-              </div>
-
-              <div *ngIf="successMessage" class="alert alert-success mt-3" role="alert">
-                {{ successMessage }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `
+  imports: [FormsModule, CommonModule],
+  templateUrl: './register.html',
+  styleUrls: ['./register.css']
 })
 export class RegisterComponent {
-  registerForm: FormGroup;
-  loading = false;
-  errorMessage = '';
-  successMessage = '';
+  model: RegisterRequest = {
+    email: '',
+    password: '',
+    repeatPassword: '',
+    firstName: '',
+    lastName: ''
+  };
 
-  constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router
-  ) {
-    this.registerForm = this.fb.group({
-      firstName: ['', [Validators.required, Validators.minLength(2)]],
-      lastName: ['', [Validators.required, Validators.minLength(2)]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
-      repeatPassword: ['', [Validators.required]]
-    }, { validators: this.passwordMatchValidator });
-  }
+  message = '';
 
-  passwordMatchValidator(form: FormGroup) {
-    const password = form.get('password');
-    const repeatPassword = form.get('repeatPassword');
-    
-    if (password && repeatPassword && password.value !== repeatPassword.value) {
-      repeatPassword.setErrors({ passwordMismatch: true });
-    } else {
-      repeatPassword?.setErrors(null);
-    }
-  }
+  constructor(private authService: AuthService) {}
 
-  onSubmit(): void {
-    if (this.registerForm.valid) {
-      this.loading = true;
-      this.errorMessage = '';
-      this.successMessage = '';
-
-      const userData: RegisterRequest = this.registerForm.value;
-
-      this.authService.register(userData).subscribe({
-        next: (response: string) => {
-          this.loading = false;
-          if (response.includes('correctamente')) {
-            this.successMessage = response;
-            setTimeout(() => {
-              this.router.navigate(['/login']);
-            }, 2000);
-          } else {
-            this.errorMessage = response;
-          }
-        },
-        error: (error: any) => {
-          this.loading = false;
-          if (error.status === 400) {
-            this.errorMessage = error.error || 'Error en el registro. Verifica los datos.';
-          } else {
-            this.errorMessage = 'Error del servidor. Intenta nuevamente.';
-          }
-          console.error('Register error:', error);
-        }
-      });
-    }
+  register() {
+    this.authService.registerUser(this.model)
+      .then(msg => this.message = msg)
+      .catch(err => this.message = 'Error: ' + err.error || 'Error desconocido');
   }
 }

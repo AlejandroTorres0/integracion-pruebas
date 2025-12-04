@@ -573,6 +573,9 @@
       "redirectUris": [
         "*"
       ],
+      "webOrigins": [
+        "*"
+      ],
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "protocol": "openid-connect"

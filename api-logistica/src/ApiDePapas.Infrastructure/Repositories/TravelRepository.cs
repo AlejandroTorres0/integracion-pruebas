@@ -15,7 +15,12 @@ namespace ApiDePapas.Infrastructure.Repositories
         {
             _context = context;
         }
-
+        public async Task<List<DistributionCenter>> GetAllDistributionCentersAsync()
+        {
+            return await _context.DistributionCenters
+                .Include(dc => dc.Address) // ¡Importante! Traer la dirección asociada
+                .ToListAsync();
+        }
         // --- MÉTODOS DE IGenericRepository<Travel> (SOLUCIÓN DEL ERROR CS0535) ---
 
         // 1. Implementación de FindAsync

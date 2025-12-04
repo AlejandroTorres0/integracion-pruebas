@@ -1,5 +1,5 @@
 ﻿using System.Net;
-
+//checkoutmodels.cs
 namespace ComprasAPI.Models.DTOs
 {
     public class InitCheckoutRequest
@@ -29,6 +29,11 @@ namespace ComprasAPI.Models.DTOs
         public decimal Total { get; set; }
         public decimal ShippingCost { get; set; }
         public string NextStep { get; set; }
+
+        // ✅ AGREGAR ESTAS PROPIEDADES NUEVAS:
+        public int ReservaId { get; set; }
+        public string EstimatedDelivery { get; set; }
+        public string ReservaStatus { get; set; }
     }
 
     public class ShippingOption

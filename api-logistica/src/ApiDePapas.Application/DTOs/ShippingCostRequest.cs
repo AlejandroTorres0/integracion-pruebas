@@ -11,7 +11,7 @@ namespace ApiDePapas.Application.DTOs
         DeliveryAddressRequest delivery_address,
 
         [property: JsonPropertyName("products")]
-        [Required]
+        [Required]  
         List<ProductQty> products
     );
 }

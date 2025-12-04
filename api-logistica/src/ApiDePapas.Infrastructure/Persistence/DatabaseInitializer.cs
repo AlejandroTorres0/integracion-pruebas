@@ -71,6 +71,8 @@ namespace ApiDePapas.Infrastructure.Persistence
                             "transport_id", "transport_type", "average_speed", "available", "max_capacity");
                         await LoadCsvDataAsync(connection, logger, "/app/csvs/_transport_method_plane.csv", "TransportMethods", ';',
                             "transport_id", "transport_type", "average_speed", "available", "max_capacity");
+                        await LoadCsvDataAsync(connection, logger, "/app/csvs/_transport_method_train.csv", "TransportMethods", ';',
+                            "transport_id", "transport_type", "average_speed", "available", "max_capacity");
 
                         await LoadCsvDataAsync(connection, logger, "/app/csvs/_addresses.csv", "Addresses", ',',
                             "address_id", "street", "number", "postal_code", "locality_name");

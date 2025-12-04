@@ -9,6 +9,7 @@ namespace ApiDePapas.Controllers
 {
     [ApiController]
     [Route("shipping/transport-methods")]
+    [Authorize(Roles = "compras-be, logistica-be")]
     public class ShippingTransportMethodsController : ControllerBase
     {
         private readonly TransportService _transportService;

@@ -108,7 +108,7 @@ namespace ComprasAPI.Controllers
                 {
                     new KeyValuePair<string, string>("client_id", "admin-cli"),
                     new KeyValuePair<string, string>("username", "admin"),
-                    new KeyValuePair<string, string>("password", "ds2025"),
+                    new KeyValuePair<string, string>("password", "admin"),
                     new KeyValuePair<string, string>("grant_type", "password")
                 });
 

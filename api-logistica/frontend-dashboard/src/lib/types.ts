@@ -38,14 +38,15 @@ export interface FiltersState {
 }
 
 export interface ProductQty {
-  id: number;
+  product_id: number;
   quantity: number;
 }
 
 export type TransportType =
-  | 'truck'
-  | 'plane'
-  | 'boat';
+  | 'road'
+  | 'air'
+  | 'sea'
+  | 'rail';
 
 export interface AddressReadDto {
   address_id: number;
@@ -80,7 +81,7 @@ export interface ShippingLogReadDto {
 }
 
 export interface ProductQtyReadDto {
-  id: number;
+  product_id: number;
   quantity: number;
 }
 
@@ -101,4 +102,38 @@ export interface ShippingDetail {
   departure_address: AddressReadDto;
   products: ProductQtyReadDto[];
   logs: ShippingLogReadDto[];
+}
+
+export interface Locality {
+  postal_code: string;
+  locality_name: string;
+  province: string;
+  country: string;
+}
+
+export interface DeliveryAddressRequest {
+  street: string;
+  number: number;
+  postal_code: string;
+  locality_name: string;
+}
+
+export interface ProductRequest {
+  id: number;
+  quantity: number;
+}
+
+export interface CreateShippingRequest {
+  order_id: number;
+  user_id: number;
+  delivery_address: DeliveryAddressRequest;
+  transport_type: TransportType;
+  products: ProductRequest[];
+}
+
+export interface CreateShippingResponse {
+  shipping_id: number;
+  status: ShipmentStatus;
+  transport_type: TransportType;
+  estimated_delivery_at: string;
 }

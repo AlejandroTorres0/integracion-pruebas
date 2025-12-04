@@ -1,0 +1,4 @@
+.status-pendiente { color: orange; font-weight: bold; }
+.status-enviado { color: blue; font-weight: bold; }
+.status-entregado { color: green; font-weight: bold; }
+.status-cancelado { color: red; font-weight: bold; }

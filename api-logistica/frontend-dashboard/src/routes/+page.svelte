@@ -1,9 +1,8 @@
 <script>
-  import Dashboard from '$lib/components/dashboard/Dashboard.svelte'
+  import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+
+  onMount(() => {
+    goto('/dashboard');
+  });
 </script>
-
-<svelte:head>
-  <title>Dashboard</title>
-</svelte:head>
-
-<Dashboard />

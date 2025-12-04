@@ -5,13 +5,10 @@ namespace ComprasAPI.Services
 {
     public interface IStockService
     {
+        Task<ReservaOutput> CrearReservaAsync(ReservaInput reserva);
+        Task<bool> CancelarReservaAsync(int idReserva, string motivo); // ← string en lugar de int
+        Task<ProductoStock> GetProductoAsync(int productoId);
         Task<List<ProductoStock>> GetAllProductsAsync();
         Task<ProductoStock> GetProductByIdAsync(int id);
-
-        // AGREGAR ESTOS MÉTODOS NUEVOS
-        Task<ReservaOutput> CrearReservaAsync(ReservaInput reserva);
-        Task<ReservaCompleta> ObtenerReservaAsync(int idReserva, int usuarioId);
-
-        Task<bool> CancelarReservaAsync(int idReserva, int usuarioId);
     }
 }

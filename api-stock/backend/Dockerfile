@@ -16,6 +16,7 @@ EXPOSE 3000
 CMD ["npm", "run", "start:prod"]
 
 COPY entrypoint.sh .
+RUN sed -i 's/\r$//' entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 EXPOSE 3000

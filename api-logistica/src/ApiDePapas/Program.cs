@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
 // Ya no necesitamos 'MySqlConnector' aquí
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,7 +21,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Base de datos
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
-        mySqlOptions => mySqlOptions.MigrationsAssembly("ApiDePapas.Infrastructure")));
+        mySqlOptions => 
+        {
+            mySqlOptions.MigrationsAssembly("ApiDePapas.Infrastructure");
+            mySqlOptions.EnableStringComparisonTranslations();
+        }));
 
 // Para habilitar Swagger / OpenAPI (documentación interactiva)
 builder.Services
@@ -105,7 +110,8 @@ builder.Services.AddAuthorization();
 // --- JWT AUTHENTICATION CONFIGURATION END ---
 
 //Registro de servicios
-//builder.Services.AddHttpClient<IStockService, StockService>();
+
+//builder.Services.AddScoped<IStockService, FakeStockService>();
 builder.Services.AddHttpClient<IPurchasingService, PurchasingService>();
 builder.Services.AddScoped<IShippingRepository, ShippingRepository>();
 builder.Services.AddScoped<ICalculateCost, CalculateCost>();
@@ -127,6 +133,28 @@ var app = builder.Build();
 await DatabaseInitializer.InitializeDatabaseAsync(app.Services);
 
 // Configurar pipeline HTTP
+
+app.Use((context, next) =>
+{
+    // Pregunta: "¿Me mandó el Gateway algún prefijo?"
+    var prefix = context.Request.Headers["X-Forwarded-Prefix"].FirstOrDefault();
+    
+    // Si el Gateway nos dio un prefijo, ajustamos la base de la app
+    if (!string.IsNullOrEmpty(prefix))
+    {
+        context.Request.PathBase = prefix;
+    }
+    return next();
+});
+
+// Habilitamos el uso de headers proxy estándar (X-Forwarded-For, etc.)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.All
+});
+
+// --- FIN DEL BLOQUE ---
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

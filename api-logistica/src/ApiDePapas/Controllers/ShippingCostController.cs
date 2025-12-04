@@ -9,6 +9,7 @@ namespace ApiDePapas.Controllers
 {
     [ApiController]
     [Route("shipping/cost")]
+    [Authorize(Roles = "compras-be, logistica-be")]
     public class ShippingCostController : ControllerBase
     {
         private readonly ICalculateCost _calculateCost;
@@ -27,9 +28,10 @@ namespace ApiDePapas.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(new Error { code = "bad_request", message = "Malformed request body." });
 
-            var costReq = new ShippingCostRequest
+            var costReq = new CalculateCostRequest
             (
                 request.delivery_address,
+                null, // Si es null, usa 'road'.
                 request.products
             );
             

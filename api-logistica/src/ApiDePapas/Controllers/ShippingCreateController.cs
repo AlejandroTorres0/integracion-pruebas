@@ -11,6 +11,7 @@ namespace ApiDePapas.Controllers
     // En ShippingCreateController.cs (versión refactorizada)   
     [ApiController]
     [Route("shipping")]
+    [Authorize(Roles = "compras-be, logistica-be")]
     public class ShippingCreateController : ControllerBase
     {
         private readonly IShippingService _shippingService;

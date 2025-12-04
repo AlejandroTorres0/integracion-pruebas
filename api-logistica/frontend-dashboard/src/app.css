@@ -1,6 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@500;700&display=swap');
+
+:root {
+  /* Fuentes */
+  --font-body: 'Nunito Sans', sans-serif;
+  --font-heading: 'Poppins', sans-serif;
+
+  /* === Paleta Half-Life (Dark) === */
+  --bg: #1c1c1e;         /* Fondo principal (Gris Carbón) */
+  --card: #2a2d30;       /* Fondo de tarjetas y superficies */
+  --text: #e5e5e5;       /* Texto principal (Blanco Roto) */
+  --muted: #9e9e9e;       /* Texto secundario/apagado */
+  --border: #3a3d42;     /* Bordes y líneas */
+  --accent: #f07c13;      /* Acento Naranja (HEV Suit) */
+  --accent-hsl: 30, 88%, 51%; /* Mismos valores HSL para el naranja */
+
+  /* Colores derivados (se pueden ajustar si es necesario) */
+  --button-bg: var(--card);
+  --button-hover: #3a3d42;
+  --header-bg: var(--card);
+}
+
+/* === Tema Claro (Estilo Oficinas Black Mesa) === */
+[data-theme="light"] {
+  --bg: #f5f5f5;         /* Fondo estéril */
+  --card: #ffffff;       /* Tarjetas blancas puras */
+  --text: #212529;       /* Texto oscuro (Carbón) */
+  --muted: #6c757d;       /* Texto secundario gris */
+  --border: #dee2e6;     /* Bordes claros */
+  --accent: #f07c13;      /* El naranja se mantiene como acento principal */
+  --accent-hsl: 30, 88%, 51%; /* Mismos valores HSL para el naranja */
+
+  --button-bg: #e9ecef;
+  --button-hover: #dee2e6;
+  --header-bg: var(--card);
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  color: #f0f0f0;
-  background-color: #1a1a1a;
+  font-family: var(--font-body);
+  color: var(--text);
+  /* background-color se mueve al pseudo-elemento */
+  position: relative; /* Necesario para el contexto de z-index */
+  transition: background-color 0.2s, color 0.2s; /* Transición suave */
+}
+
+/* Efecto Dither Global */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1; /* Detrás de todo el contenido */
+
+  /* Patrón de Dithering/Ruido más notorio */
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 4px 4px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+.transport-icon {
+  font-size: 1.5rem;
+  color: var(--accent);
 }

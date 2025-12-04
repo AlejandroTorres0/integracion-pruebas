@@ -1,42 +1,153 @@
-﻿// Services/LogisticaService.cs
-using ComprasAPI.Models.DTOs;
+﻿using ComprasAPI.Models.DTOs;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
+using ComprasAPI.Models; // Asegúrate que este using incluya todas las clases DTO/Modelos de ComprasAPI
 
 namespace ComprasAPI.Services
 {
     public class LogisticaService : ILogisticaService
     {
         private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<LogisticaService> _logger;
 
-        public LogisticaService(HttpClient httpClient, ILogger<LogisticaService> logger)
+        public LogisticaService(HttpClient httpClient, IConfiguration configuration, ILogger<LogisticaService> logger)
         {
             _httpClient = httpClient;
+            _configuration = configuration;
             _logger = logger;
+
+            // --- CÓDIGO CORREGIDO DEL CONSTRUCTOR ---
+            // 1. Intentamos leer la URL desde la configuración (ExternalApis__Logistica__BaseUrl)
+            var baseUrl = _configuration["ExternalApis:Logistica:BaseUrl"];
+
+            // 2. Fallback para desarrollo local fuera de Docker
+            if (string.IsNullOrEmpty(baseUrl))
+            {
+                baseUrl = "http://localhost:5002/";
+            }
+
+            // 3. Asignamos la BaseAddress dinámica
+            _httpClient.BaseAddress = new Uri(baseUrl);
+            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
         }
+
+        // -------------------------------------------------------------------
+        // 1. OBTENCIÓN DEL TOKEN
+        // -------------------------------------------------------------------
+        private async Task<string> ObtenerTokenKeycloakAsync()
+        {
+            try
+            {
+                var tokenEndpoint = _configuration["ExternalApis:Logistica:TokenEndpoint"];
+                var clientId = _configuration["ExternalApis:Logistica:ClientId"];
+                var clientSecret = _configuration["ExternalApis:Logistica:ClientSecret"];
+
+                var keycloakRequest = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint);
+                var collection = new List<KeyValuePair<string, string>>
+                {
+                    new("grant_type", "client_credentials"),
+                    new("client_id", clientId),
+                    new("client_secret", clientSecret)
+                };
+                keycloakRequest.Content = new FormUrlEncodedContent(collection);
+
+                // Usamos un cliente nuevo temporal para Keycloak
+                using var tokenClient = new HttpClient();
+                var response = await tokenClient.SendAsync(keycloakRequest);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+                    return doc.RootElement.GetProperty("access_token").GetString();
+                }
+
+                _logger.LogError($"Fallo Keycloak: {response.StatusCode}");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error conectando a Keycloak");
+                return string.Empty;
+            }
+        }
+
+        // -------------------------------------------------------------------
+        // 2. MÉTODO AUXILIAR PARA ENVIAR REQUESTS AUTENTICADOS
+        // -------------------------------------------------------------------
+        private async Task<HttpResponseMessage> SendAuthenticatedRequestAsync(HttpRequestMessage request)
+        {
+            var token = await ObtenerTokenKeycloakAsync();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            else
+            {
+                _logger.LogWarning("No se pudo obtener token, intentando request anónimo (probable 401).");
+            }
+
+            return await _httpClient.SendAsync(request);
+        }
+
+        // -------------------------------------------------------------------
+        // 3. MÉTODOS PÚBLICOS (TODOS USAN SendAuthenticatedRequestAsync)
+        // -------------------------------------------------------------------
 
         public async Task<ShippingCostResponse> CalcularCostoEnvioAsync(ShippingCostRequest request)
         {
             try
             {
-                _logger.LogInformation(" Calculando costo de envío...");
+                _logger.LogInformation("💰 Calculando costo de envío en Logística API...");
 
-                var json = JsonSerializer.Serialize(request);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync("shipping/cost", content);
-                response.EnsureSuccessStatusCode();
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<ShippingCostResponse>(responseContent, new JsonSerializerOptions
+                // Mapeo de DTOs
+                var deliveryAddress = new
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    street = request.DeliveryAddress.Street,
+                    number = ExtractStreetNumber(request.DeliveryAddress.Street),
+                    postal_code = request.DeliveryAddress.PostalCode,
+                    locality_name = request.DeliveryAddress.City
+                };
+                var productos = request.Products?.Select(p => new { product_id = p.Id, quantity = p.Quantity }).ToList();
+                var costoRequest = new { delivery_address = deliveryAddress, products = productos };
+
+                var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false };
+                var json = JsonSerializer.Serialize(costoRequest, jsonOptions);
+                _logger.LogInformation($"🧮 JSON para cálculo: {json}");
+
+                // ENVIAR REQUEST AUTENTICADO
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, "shipping/cost");
+                httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await SendAuthenticatedRequestAsync(httpRequest); // Usa el auxiliar
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"✅ Costo calculado: {responseContent}");
+
+                    // Deserialización y retorno
+                    var costoApiResponse = JsonSerializer.Deserialize<CostoEnvioApiResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    return new ShippingCostResponse {
+                        Currency = costoApiResponse.currency, TotalCost = (decimal)costoApiResponse.total_cost,
+                        TransportType = costoApiResponse.transport_type,
+                        Products = costoApiResponse.products?.Select(p => new ProductCost { Id = p.id, Cost = (decimal)p.cost }).ToList() ?? new List<ProductCost>()
+                    };
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning($"⚠️ Error calculando costo: {response.StatusCode} - {errorContent}");
+                    return CalcularCostoPrueba(request);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, " Logística API no disponible - Usando cálculo de prueba");
+                _logger.LogWarning(ex, "⚠️ Logística API no disponible - Usando cálculo de prueba");
                 return CalcularCostoPrueba(request);
             }
         }
@@ -45,24 +156,73 @@ namespace ComprasAPI.Services
         {
             try
             {
-                _logger.LogInformation(" Creando envío en Logística API...");
+                _logger.LogInformation("🚚 CREANDO ENVÍO EN LOGÍSTICA API...");
 
-                var json = JsonSerializer.Serialize(request);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync("/shipping", content);
-                response.EnsureSuccessStatusCode();
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<CreateShippingResponse>(responseContent, new JsonSerializerOptions
+                // Mapeo de DTOs
+                var envioRequest = new
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    order_id = request.OrderId,
+                    user_id = request.UserId,
+                    delivery_address = new
+                    {
+                        street = request.DeliveryAddress.Street,
+                        number = request.DeliveryAddress.Number,
+                        postal_code = request.DeliveryAddress.PostalCode,
+                        locality_name = request.DeliveryAddress.LocalityName
+                    },
+                    transport_type = request.TransportType?.ToLower() ?? "truck",
+                    products = request.Products?.Select(p => new { id = p.Id, quantity = p.Quantity }).ToList()
+                };
+
+                var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false };
+                var json = JsonSerializer.Serialize(envioRequest, jsonOptions);
+                _logger.LogInformation($"📦 JSON para creación: {json}");
+
+                // ENVIAR REQUEST AUTENTICADO
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, "shipping");
+                httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await SendAuthenticatedRequestAsync(httpRequest); // Usa el auxiliar
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"🎉 ¡ENVÍO CREADO EXITOSAMENTE!: {responseContent}");
+
+                    try
+                    {
+                         var envioApiResponse = JsonSerializer.Deserialize<EnvioCreadoApiResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                         decimal shippingCost = await ObtenerCostoEstimadoAsync(request);
+
+                         return new CreateShippingResponse
+                         {
+                             ShippingId = envioApiResponse.shipping_id, Status = envioApiResponse.status,
+                             TransportType = envioApiResponse.transport_type, EstimatedDeliveryAt = envioApiResponse.estimated_delivery_at,
+                             ShippingCost = shippingCost
+                         };
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        _logger.LogWarning(jsonEx, "⚠️ Error deserializando respuesta real");
+                        return GenerateFallbackResponse(request, "Error de deserialización");
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"❌ ERROR CREANDO ENVÍO: {response.StatusCode} - {errorContent}");
+                    return GenerateFallbackResponse(request, errorContent);
+                }
+            }
+            catch (HttpRequestException httpEx)
+            {
+                 _logger.LogError(httpEx, "💥 Error de conexión con Logística API");
+                 return GenerateFallbackResponse(request, "Error de conexión");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, " Logística API no disponible - Creando envío de prueba");
-                return CrearEnvioPrueba(request);
+                _logger.LogError(ex, "💥 Error inesperado en CrearEnvioAsync");
+                return GenerateFallbackResponse(request, $"Error interno: {ex.Message}");
             }
         }
 
@@ -70,20 +230,35 @@ namespace ComprasAPI.Services
         {
             try
             {
-                _logger.LogInformation($" Obteniendo seguimiento para envío {shippingId}...");
+                _logger.LogInformation($"🔍 Obteniendo seguimiento para envío {shippingId}...");
 
-                var response = await _httpClient.GetAsync($"/shipping/{shippingId}");
-                response.EnsureSuccessStatusCode();
+                // ENVIAR REQUEST AUTENTICADO
+                var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"shipping/{shippingId}");
+                var response = await SendAuthenticatedRequestAsync(httpRequest); // Usa el auxiliar
 
-                var responseContent = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<ShippingDetail>(responseContent, new JsonSerializerOptions
+                if (response.IsSuccessStatusCode)
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    var seguimientoApiResponse = JsonSerializer.Deserialize<ShippingDetailApiResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    return new ShippingDetail 
+                    { 
+                        ShippingId = seguimientoApiResponse.shipping_id, Status = seguimientoApiResponse.status,
+                        EstimatedDeliveryAt = seguimientoApiResponse.estimated_delivery_at, TrackingNumber = seguimientoApiResponse.tracking_number,
+                        CarrierName = seguimientoApiResponse.carrier_name
+                    };
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning($"⚠️ Error obteniendo seguimiento: {response.StatusCode} - {errorContent}");
+                    return ObtenerSeguimientoPrueba(shippingId);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, $" Error obteniendo seguimiento {shippingId}");
+                _logger.LogWarning(ex, $"⚠️ Error obteniendo seguimiento {shippingId} - Usando datos de prueba");
                 return ObtenerSeguimientoPrueba(shippingId);
             }
         }
@@ -92,50 +267,145 @@ namespace ComprasAPI.Services
         {
             try
             {
-                _logger.LogInformation(" Obteniendo métodos de transporte...");
+                _logger.LogInformation("🚛 Obteniendo métodos de transporte...");
 
-                var response = await _httpClient.GetAsync("/shipping/transport-methods");
-                response.EnsureSuccessStatusCode();
+                // ENVIAR REQUEST AUTENTICADO
+                var httpRequest = new HttpRequestMessage(HttpMethod.Get, "shipping/transport-methods");
+                var response = await SendAuthenticatedRequestAsync(httpRequest); // Usa el auxiliar
 
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<TransportMethodsResponse>(responseContent, new JsonSerializerOptions
+                if (response.IsSuccessStatusCode)
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    var responseContent = await response.Content.ReadAsStringAsync();
 
-                return result?.TransportMethods ?? new List<TransportMethod>();
+                    var transportMethods = JsonSerializer.Deserialize<TransportMethodsApiResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    _logger.LogInformation($"✅ {transportMethods.transport_methods?.Count ?? 0} métodos obtenidos");
+
+                    return transportMethods.transport_methods?.Select(t => new TransportMethod { Type = t.type, Name = t.name, EstimatedDays = t.estimated_days }).ToList() ?? GetTransportMethodsDefault();
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ Error obteniendo métodos - Usando métodos por defecto");
+                    return GetTransportMethodsDefault();
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, " Error obteniendo métodos de transporte - Usando datos de prueba");
-                return ObtenerMetodosTransportePrueba();
+                _logger.LogWarning(ex, "⚠️ Error obteniendo métodos de transporte - Usando por defecto");
+                return GetTransportMethodsDefault();
             }
         }
 
-        // Métodos de prueba para cuando la API no está disponible
+        // -------------------------------------------------------------------
+        // 4. MÉTODOS AUXILIARES (Funciones de Soporte para Fallbacks y Lógica de Negocio)
+        // -------------------------------------------------------------------
+
+        // Este método resuelve el error CS0103 en CrearEnvioAsync (línea 198)
+        private async Task<decimal> ObtenerCostoEstimadoAsync(CreateShippingRequest request)
+        {
+            try
+            {
+                // Convertir a ShippingCostRequest para calcular costo
+                var costoRequest = new ShippingCostRequest
+                {
+                    DeliveryAddress = new Address
+                    {
+                        Street = request.DeliveryAddress.Street,
+                        City = request.DeliveryAddress.LocalityName, // Mapear LocalityName a City
+                        PostalCode = request.DeliveryAddress.PostalCode,
+                        State = "", 
+                        Country = "AR"
+                    },
+                    Products = request.Products?.Select(p => new ProductRequest
+                    {
+                        Id = p.Id,
+                        Quantity = p.Quantity
+                    }).ToList() ?? new List<ProductRequest>()
+                };
+
+                var costoResponse = await CalcularCostoEnvioAsync(costoRequest);
+                return costoResponse.TotalCost;
+            }
+            catch
+            {
+                // Si el cálculo de costo falla (por conexión), usa el fallback realista.
+                return CalculateRealisticShippingCost(request.Products, request.TransportType);
+            }
+        }
+
+        // Este método resuelve el error CS0103 de la función de Fallback
+        private CreateShippingResponse GenerateFallbackResponse(CreateShippingRequest request, string reason)
+        {
+            _logger.LogWarning($"🔄 Usando respuesta de respaldo: {reason}");
+
+            var random = new Random();
+            return new CreateShippingResponse
+            {
+                ShippingId = 900000 + random.Next(1000, 9999),
+                Status = "created_fallback",
+                TransportType = request.TransportType,
+                EstimatedDeliveryAt = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                ShippingCost = CalculateRealisticShippingCost(request.Products, request.TransportType)
+            };
+        }
+
+        // Este método resuelve el error CS0103 de la función de Cálculo Realista (usado por el Fallback)
+        private decimal CalculateRealisticShippingCost(List<ShippingProduct> products, string transportType)
+        {
+            var baseCost = transportType?.ToLower() switch
+            {
+                "air" => 5000.00m,
+                "plane" => 5000.00m,
+                "truck" => 3000.00m,
+                "ship" => 2000.00m,
+                "boat" => 2000.00m,
+                _ => 3000.00m
+            };
+
+            var itemsCost = (products?.Sum(p => p.Quantity * 100) ?? 100);
+            var distanceCost = 2000.00m;
+
+            return baseCost + itemsCost + distanceCost;
+        }
+
+        // Este método es usado por el mapeo de CalcularCostoEnvioAsync
+        private int ExtractStreetNumber(string street)
+        {
+            if (string.IsNullOrEmpty(street))
+                return 0;
+
+            var match = Regex.Match(street, @"\d+");
+            if (match.Success && int.TryParse(match.Value, out int number))
+            {
+                return number <= 9999 ? number : 0;
+            }
+
+            return 0;
+        }
+        
+        // Métodos auxiliares de Logística (para fallbacks)
+        private List<TransportMethod> GetTransportMethodsDefault()
+        {
+            return new List<TransportMethod>
+            {
+                new TransportMethod { Type = "truck", Name = "Camión", EstimatedDays = "3-5" },
+                new TransportMethod { Type = "plane", Name = "Avión", EstimatedDays = "1-2" },
+                new TransportMethod { Type = "ship", Name = "Barco", EstimatedDays = "7-10" }
+            };
+        }
+
         private ShippingCostResponse CalcularCostoPrueba(ShippingCostRequest request)
         {
             return new ShippingCostResponse
             {
                 Currency = "ARS",
-                TotalCost = 45.50M,
-                TransportType = "road",
+                TotalCost = 6878.5M,
+                TransportType = "truck",
                 Products = request.Products.Select(p => new ProductCost
                 {
                     Id = p.Id,
-                    Cost = p.Quantity * 10.0M
+                    Cost = p.Quantity * 100.0M
                 }).ToList()
-            };
-        }
-
-        private CreateShippingResponse CrearEnvioPrueba(CreateShippingRequest request)
-        {
-            return new CreateShippingResponse
-            {
-                ShippingId = new Random().Next(1000, 9999),
-                Status = "created",
-                TransportType = request.TransportType,
-                EstimatedDeliveryAt = DateTime.UtcNow.AddDays(5).ToString("yyyy-MM-ddTHH:mm:ssZ")
             };
         }
 
@@ -147,18 +417,58 @@ namespace ComprasAPI.Services
                 Status = "in_transit",
                 EstimatedDeliveryAt = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 TrackingNumber = $"TRACK-{shippingId}",
-                CarrierName = "Transporte de Prueba SA"
+                CarrierName = "Transporte Local SA"
             };
         }
 
-        private List<TransportMethod> ObtenerMetodosTransportePrueba()
+        // -------------------------------------------------------------------
+        // 5. CLASES DE RESPUESTA DE LOGÍSTICA API (DTOs internos)
+        // -------------------------------------------------------------------
+
+        private class CostoEnvioApiResponse
         {
-            return new List<TransportMethod>
-            {
-                new TransportMethod { Type = "road", Name = "Transporte Terrestre", EstimatedDays = "3-5" },
-                new TransportMethod { Type = "air", Name = "Transporte Aéreo", EstimatedDays = "1-2" },
-                new TransportMethod { Type = "rail", Name = "Transporte Ferroviario", EstimatedDays = "5-7" }
-            };
+            public string currency { get; set; }
+            public float total_cost { get; set; }
+            public string transport_type { get; set; }
+            public List<ProductoCostoApi> products { get; set; }
+        }
+
+        private class ProductoCostoApi
+        {
+            public int id { get; set; }
+            public float cost { get; set; }
+        }
+
+        private class EnvioCreadoApiResponse
+        {
+            public int shipping_id { get; set; }
+            public string status { get; set; }
+            public string transport_type { get; set; }
+            public string estimated_delivery_at { get; set; }
+        }
+
+        private class ShippingDetailApiResponse
+        {
+            public int shipping_id { get; set; }
+            public string status { get; set; }
+            public string estimated_delivery_at { get; set; }
+            public string tracking_number { get; set; }
+            public string carrier_name { get; set; }
+            public string transport_type { get; set; } 
+            public float? total_cost { get; set; } 
+            public string currency { get; set; }
+        }
+
+        private class TransportMethodsApiResponse
+        {
+            public List<TransportMethodApi> transport_methods { get; set; }
+        }
+
+        private class TransportMethodApi
+        {
+            public string type { get; set; }
+            public string name { get; set; }
+            public string estimated_days { get; set; }
         }
     }
 }

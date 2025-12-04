@@ -1,0 +1,161 @@
+<div class="container mt-4">
+  <!-- Encabezado -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Finalizar Compra</h2>
+    <button class="btn btn-outline-secondary" (click)="goBack()">
+      ← Volver al Carrito
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+    <p class="mt-2">Cargando información del carrito...</p>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="errorMessage && !loading" class="alert alert-danger">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Contenido principal -->
+  <div *ngIf="!loading && cartItemsCount > 0" class="row">
+    <!-- Resumen del carrito -->
+    <div class="col-md-4 mb-4">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Resumen del Pedido</h5>
+        </div>
+        <div class="card-body">
+          <p><strong>Productos:</strong> {{ cartItemsCount }}</p>
+          <p><strong>Total:</strong> ${{ cartTotal }}</p>
+          <div class="alert alert-info">
+            <small>
+              <strong>⚠️ Importante:</strong> 
+              Después de confirmar el pedido, no podrás realizar cambios.
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario de envío -->
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Información de Envío</h5>
+        </div>
+        <div class="card-body">
+          <form (ngSubmit)="submitOrder()" #checkoutForm="ngForm">
+            
+            <!-- Dirección -->
+            <div class="mb-3">
+              <label for="street" class="form-label">Calle y Número *</label>
+              <input type="text" 
+                     class="form-control" 
+                     id="street" 
+                     name="street"
+                     [(ngModel)]="deliveryAddress.street"
+                     required
+                     placeholder="Ej: Avenida Corrientes 900">
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="city" class="form-label">Ciudad *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="city" 
+                       name="city"
+                       [(ngModel)]="deliveryAddress.city"
+                       required
+                       placeholder="Ej: Resistencia">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="state" class="form-label">Provincia *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="state" 
+                       name="state"
+                       [(ngModel)]="deliveryAddress.state"
+                       required
+                       placeholder="Ej: Chaco">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="postalCode" class="form-label">Código Postal *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="postalCode" 
+                       name="postalCode"
+                       [(ngModel)]="deliveryAddress.postalCode"
+                       required
+                       placeholder="Ej: H3500">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="country" class="form-label">País</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="country" 
+                       value="Argentina"
+                       disabled
+                       placeholder="Argentina">
+                <small class="text-muted">Actualmente solo enviamos a Argentina</small>
+              </div>
+            </div>
+
+            <!-- Método de envío -->
+            <div class="mb-4">
+              <label class="form-label">Método de Envío *</label>
+              <div *ngFor="let option of transportOptions" class="form-check">
+                <input class="form-check-input" 
+                       type="radio" 
+                       name="transportType" 
+                       [id]="'transport-' + option.value"
+                       [(ngModel)]="transportType"
+                       [value]="option.value"
+                       required>
+                <label class="form-check-label" [for]="'transport-' + option.value">
+                  {{ option.label }}
+                </label>
+              </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="d-flex justify-content-between">
+              <button type="button" 
+                      class="btn btn-secondary" 
+                      (click)="goBack()"
+                      [disabled]="submitting">
+                Cancelar
+              </button>
+              
+              <button type="submit" 
+                      class="btn btn-primary btn-lg"
+                      [disabled]="submitting || !checkoutForm.form.valid">
+                <span *ngIf="!submitting">✅ Confirmar Pedido (${{ cartTotal }})</span>
+                <span *ngIf="submitting">
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                  Procesando...
+                </span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Carrito vacío -->
+  <div *ngIf="!loading && cartItemsCount === 0" class="alert alert-warning">
+    <h4>Carrito vacío</h4>
+    <p>No tienes productos en tu carrito.</p>
+    <a routerLink="/paginaproductos" class="btn btn-primary">
+      Ir a Productos
+    </a>
+  </div>
+</div>

@@ -9,5 +9,6 @@ namespace ApiDePapas.Domain.Repositories
     {
         // Método para buscar un viaje activo o crear uno nuevo (lógica compleja)
         Task<int> AssignToExistingOrCreateNewTravelAsync(int distributionCenterId, int transportMethodId);
+        Task<List<DistributionCenter>> GetAllDistributionCentersAsync();
     }
 }

@@ -1,5 +1,7 @@
 // ApiDePapas/Controllers/ShippingCancelController.cs (Volviendo a la lógica original)
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using ApiDePapas.Application.Interfaces;
 using ApiDePapas.Application.DTOs;
 using ApiDePapas.Domain.Entities;
@@ -8,6 +10,7 @@ namespace ApiDePapas.Controllers
 {
     [ApiController]
     [Route("shipping")]
+    [Authorize(Roles = "compras-be, stock-be, logistica-be")]
     public class ShippingCancelController : ControllerBase
     {
         // Revertimos la inyección a IShippingService

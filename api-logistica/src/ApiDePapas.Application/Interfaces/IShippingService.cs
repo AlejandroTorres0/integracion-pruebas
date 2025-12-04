@@ -14,5 +14,7 @@ namespace ApiDePapas.Application.Interfaces
         Task<ShippingDetailResponse?> GetByIdAsync(int id);
         Task<CancelShippingResponse> CancelAsync(int id, DateTime whenUtc);
         Task<ShippingListResponse> List(int? userId,ShippingStatus? status,DateOnly? fromDate,DateOnly? toDate,int page,int limit);
+
+        Task<bool> UpdateStatusAsync(int shippingId, UpdateStatusRequest request);
     }
 }

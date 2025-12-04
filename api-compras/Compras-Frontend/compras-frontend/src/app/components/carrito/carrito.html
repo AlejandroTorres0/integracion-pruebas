@@ -1,0 +1,73 @@
+<div class="container mt-4">
+  <h2>Mi Carrito</h2>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando carrito...</span>
+    </div>
+    <p class="mt-2">Cargando tu carrito...</p>
+  </div>
+
+  <!-- Carrito con productos -->
+  <div class="row mt-4" *ngIf="!loading && cart.length > 0">
+    <div class="col">
+      <h3>Carrito ({{cart.length}} productos)</h3>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Precio</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of cart; let i = index">
+            <td>
+              <strong>{{item.nombre}}</strong>
+              <br>
+              <small class="text-muted">{{item.descripcion}}</small>
+              <br>
+              <small class="text-muted">Stock: {{item.stockDisponible}}</small>
+            </td>
+            <td>${{item.precio}}</td>
+            <td>
+              <input type="number"
+                     class="form-control form-control-sm"
+                     [(ngModel)]="item.quantity"
+                     min="1"
+                     [max]="item.stockDisponible"
+                     style="width: 80px;"
+                     (change)="validateQuantity(item)">
+            </td>
+            <td>${{item.precio * item.quantity}}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" (click)="removeFromCart(i)">
+                ❌ Eliminar
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="text-end">
+        <h4>Total: ${{ getCartTotal() }}</h4>
+      </div>
+
+      <div class="text-end">
+        <button 
+          class="btn btn-primary btn-lg" 
+          [routerLink]="['/checkout']"
+          [disabled]="cart.length === 0">
+          🛒 Finalizar Compra
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Carrito vacío -->
+  <div *ngIf="!loading && cart.length === 0" class="alert alert-info mt-3">
+    Tu carrito está vacío.
+  </div>
+</div>

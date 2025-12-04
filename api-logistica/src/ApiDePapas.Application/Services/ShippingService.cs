@@ -19,6 +19,7 @@ namespace ApiDePapas.Application.Services
         private readonly IAddressRepository _address_repository;
         private readonly ITravelRepository _travel_repository;
         private readonly IPurchasingService _purchasing_service;
+        private readonly IDistanceService _distance_service;
 
         // Constructor se mantiene
         public ShippingService(
@@ -27,7 +28,8 @@ namespace ApiDePapas.Application.Services
             ILocalityRepository localityRepository,
             IAddressRepository addressRepository,
             ITravelRepository travelRepository,
-            IPurchasingService purchasingService)
+            IPurchasingService purchasingService,
+            IDistanceService distanceService)
         {
             _calculate_cost = calculateCost;
             _shipping_repository = shippingRepository;
@@ -35,6 +37,7 @@ namespace ApiDePapas.Application.Services
             _address_repository = addressRepository;
             _travel_repository = travelRepository;
             _purchasing_service = purchasingService;
+            _distance_service = distanceService;
         }
 
         // IMPLEMENTACIÓN DE CREACIÓN (ACTUALIZADA: Manejo de errores con null)
@@ -44,13 +47,15 @@ namespace ApiDePapas.Application.Services
             if (req == null || req.products == null || req.products.Count == 0)
                 return null;
 
-            var costReq = new ShippingCostRequest(
+            var costReq = new CalculateCostRequest(
                 req.delivery_address,
+                req.transport_type,
                 req.products.Select(p => new ProductQty(p.id, p.quantity)).ToList()
             );
             var cost = await _calculate_cost.CalculateShippingCostAsync(costReq);
 
-            int default_estimated_days = 3;
+            // 🔽 NUEVO: los días estimados vienen de CalculateCost (máximo según tipo de transporte)
+            int estimated_days = CalculateCost.GetMaxEstimatedDays(req.transport_type);
 
             var locality = await _locality_repository.GetByCompositeKeyAsync(
                 req.delivery_address.postal_code,
@@ -81,9 +86,49 @@ namespace ApiDePapas.Application.Services
             }
             int delivery_address_id = existingAddress.address_id;
 
+            // ========================================================================
+            // 🚛 LÓGICA DE SELECCIÓN DE CENTRO DE DISTRIBUCIÓN más cercano al cliente
+            // ==========================================================================
+            
+            // A. Obtener todos los CDs disponibles
+            var distributionCenters = await _travel_repository.GetAllDistributionCentersAsync();
+            
+            int bestDcId = 1; // Default por si acaso
+            double minDistance = double.MaxValue;
+
+            // B. Iterar y buscar el más cercano
+            foreach (var dc in distributionCenters)
+            {
+                // Si el CD no tiene dirección, lo saltamos
+                if (dc.Address == null) continue;
+
+                // Calculamos distancia: CD PostalCode -> Cliente PostalCode
+                double dist = await _distance_service.GetDistanceKm(
+                    dc.Address.postal_code, 
+                    req.delivery_address.postal_code
+                );
+
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    bestDcId = dc.distribution_center_id;
+                }
+            }
+            // ==========================================================
+
+            // Mapeo del transporte (tu código de antes)
+            int transportMethodId = req.transport_type switch
+            {
+                TransportType.road => 1,
+                TransportType.air  => 2001,
+                TransportType.rail => 3,
+                TransportType.sea  => 1001,
+            
+            };
+
             int travel_id = await _travel_repository.AssignToExistingOrCreateNewTravelAsync(
-                distributionCenterId: 1,
-                transportMethodId: 1
+                distributionCenterId: bestDcId, // 
+                transportMethodId: transportMethodId
             );
 
             var newShipping = new ShippingDetail
@@ -102,7 +147,8 @@ namespace ApiDePapas.Application.Services
                 created_at = DateTime.UtcNow,
                 updated_at = DateTime.UtcNow,
 
-                estimated_delivery_at = DateTime.UtcNow.AddDays(default_estimated_days),
+                // 🔽 AQUÍ USAMOS LOS DÍAS CALCULADOS SEGÚN EL TIPO DE TRANSPORTE
+                estimated_delivery_at = DateTime.UtcNow.AddDays(estimated_days),
 
                 tracking_number = Guid.NewGuid().ToString(),
                 carrier_name = "PENDIENTE",
@@ -130,7 +176,7 @@ namespace ApiDePapas.Application.Services
 
             var departureAddressEntity = data.Travel?.DistributionCenter?.Address;
 
-            // Mapeo al DTO que SÍ tenés
+            // Mapeo al DTO 
             var responseDto = new ShippingDetailResponse
             {
                 shipping_id = data.shipping_id,
@@ -180,23 +226,43 @@ namespace ApiDePapas.Application.Services
             
             return responseDto;
         }
+        private void TransitionToStatus(ShippingDetail shipping, ShippingStatus newStatus, string message)
+        {
+            // 1. Actualizar estado y fecha
+            shipping.status = newStatus;
+            shipping.updated_at = DateTime.UtcNow;
 
+            // 2. Asegurar que la lista de logs exista
+            if (shipping.logs == null) 
+                shipping.logs = new List<ShippingLog>();
+
+            // 3. Agregar el log histórico
+            shipping.logs.Add(new ShippingLog(
+                Timestamp: DateTime.UtcNow,
+                Status: newStatus,
+                Message: message
+            ));
+        }
         // IMPLEMENTACIÓN REINTRODUCIDA (De la rama VIEJA)
         public async Task<CancelShippingResponse> CancelAsync(int id, DateTime whenUtc)
         {
+            // 1. Obtener entidad
             var s = await _shipping_repository.GetByIdAsync(id);
             if (s is null)
                 throw new KeyNotFoundException($"Shipping {id} not found");
 
+            // 2. Validar estado actual
             if (s.status is ShippingStatus.delivered or ShippingStatus.cancelled)
-                throw new InvalidOperationException(
-                    $"Shipping {id} cannot be cancelled in state '{s.status}'.");
+                throw new InvalidOperationException($"Shipping {id} cannot be cancelled in state '{s.status}'.");
 
-            await _shipping_repository.UpdateStatusAsync(id, ShippingStatus.cancelled);
+            // 3. Usar el método auxiliar para cambiar estado y agregar LOG
+            TransitionToStatus(s, ShippingStatus.cancelled, "The shipment was cancelled");
 
-            // Notify the purchasing service about the cancellation.
-            // We don't want to block the response while waiting for this, so we don't await the task.
-            // A more robust solution might involve a background job or a message queue.
+            // 4. Guardar entidad completa 
+            // Usamos el Update genérico del repositorio para que EF Core detecte el cambio en la columna JSON 'logs'
+            _shipping_repository.Update(s);
+
+            // 5. Notificar (Fuego y olvido)
             _ = _purchasing_service.NotifyShippingCancellationAsync(id);
 
             return new CancelShippingResponse(
@@ -244,7 +310,7 @@ namespace ApiDePapas.Application.Services
                 Status: s.status,
                 TransportType: (s.Travel != null && s.Travel.TransportMethod != null)
                                 ? s.Travel.TransportMethod.transport_type
-                                : TransportType.truck,
+                                : TransportType.road,
                 EstimatedDeliveryAt: s.estimated_delivery_at,
                 CreatedAt: s.created_at
             )).ToList();
@@ -257,6 +323,47 @@ namespace ApiDePapas.Application.Services
             );
 
             return new ShippingListResponse(summaries, pagination);
+        }
+
+        public async Task<bool> UpdateStatusAsync(int shippingId, UpdateStatusRequest request)
+        {
+            var shipping = await _shipping_repository.GetByIdAsync(shippingId);
+            if (shipping == null)
+            {
+                return false; // O lanzar KeyNotFoundException si se prefiere
+            }
+
+            // 1. Si ya está Cancelado, no se puede tocar.
+            if (shipping.status == ShippingStatus.cancelled)
+            {
+                throw new InvalidOperationException($"El envío {shippingId} está cancelado y no puede modificarse.");
+            }
+
+            // 2. Si ya está Entregado, no se puede cambiar (a menos que implementes lógica de devoluciones).
+            if (shipping.status == ShippingStatus.delivered)
+            {
+                throw new InvalidOperationException($"El envío {shippingId} ya fue entregado y no puede cambiar de estado.");
+            }
+            // 3. No permitir revertir a 'Created' desde otros estados.
+            if (request.NewStatus == ShippingStatus.created && shipping.status != ShippingStatus.created)
+            {
+                throw new InvalidOperationException($"No se puede revertir el envío {shippingId} al estado 'Created'.");
+            }
+            if (request.NewStatus == ShippingStatus.cancelled)
+            {
+                // CancelAsync se encarga de validar si se puede cancelar 
+                // y de enviar la notificación a Compras.
+                await CancelAsync(shippingId, DateTime.UtcNow);
+                return true;
+            }
+
+            // Usar el método helper para aplicar el cambio de estado y el log
+            TransitionToStatus(shipping, request.NewStatus, request.Message);
+
+            // El método Update del repositorio ya se encarga de llamar a SaveChanges.
+            _shipping_repository.Update(shipping);
+
+            return true;
         }
     }
 }

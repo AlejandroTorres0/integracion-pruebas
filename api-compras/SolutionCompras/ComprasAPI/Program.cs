@@ -13,17 +13,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration["Jwt:Key"] = "MI_CLAVE_SECRETA_DE_EXACTAMENTE_32_!!AAAA";
 builder.Configuration["Jwt:Issuer"] = "ComprasAPI";
 builder.Configuration["Jwt:Audience"] = "ComprasUsuarios";
-builder.Services.AddHttpClient();
+//builder.Services.AddHttpClient();
 
 // ✅ 1. CONFIGURAR STOCK SERVICE
-builder.Services.AddHttpClient<IStockService, StockService>((provider, client) =>
+builder.Services.AddHttpClient<IStockService, StockService>(client =>
 {
-    var config = provider.GetRequiredService<IConfiguration>();
-    var stockApiUrl = config["ExternalApis:Stock:BaseUrl"] ?? "http://localhost:5001";
-
-    client.BaseAddress = new Uri(stockApiUrl);
+    client.BaseAddress = new Uri("http://localhost:3000/");
     client.Timeout = TimeSpan.FromSeconds(30);
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
 
 // ✅ 2. CONFIGURAR LOGÍSTICA SERVICE
@@ -38,8 +34,8 @@ builder.Services.AddHttpClient<ILogisticaService, LogisticaService>((provider, c
 });
 
 // ✅ 3. REGISTRAR SERVICIOS
-//builder.Services.AddScoped<IStockService, StockService>();
-//builder.Services.AddScoped<ILogisticaService, LogisticaService>();
+builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<ILogisticaService, LogisticaService>();
 
 // AÑADIR JWT CON KEYCLOACK
 builder.Services

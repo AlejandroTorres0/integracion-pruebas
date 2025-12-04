@@ -1,136 +1,15 @@
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-      <div class="card shadow">
-        <div class="card-body p-4">
-          <h2 class="card-title text-center mb-4">Registro de Usuario</h2>
-          
-          <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="firstName" class="form-label">Nombre</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="firstName"
-                    formControlName="firstName"
-                    [class.is-invalid]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched"
-                    placeholder="Tu nombre"
-                  >
-                  <div class="invalid-feedback" *ngIf="registerForm.get('firstName')?.errors?.['required']">
-                    El nombre es requerido
-                  </div>
-                  <div class="invalid-feedback" *ngIf="registerForm.get('firstName')?.errors?.['minlength']">
-                    Mínimo 2 caracteres
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="lastName" class="form-label">Apellido</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="lastName"
-                    formControlName="lastName"
-                    [class.is-invalid]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched"
-                    placeholder="Tu apellido"
-                  >
-                  <div class="invalid-feedback" *ngIf="registerForm.get('lastName')?.errors?.['required']">
-                    El apellido es requerido
-                  </div>
-                  <div class="invalid-feedback" *ngIf="registerForm.get('lastName')?.errors?.['minlength']">
-                    Mínimo 2 caracteres
-                  </div>
-                </div>
-              </div>
-            </div>
+<div class="container mt-4">
+  <h2>Registro de Usuario</h2>
+  <form (ngSubmit)="register()">
+    <input [(ngModel)]="model.firstName" name="firstName" placeholder="Nombre" required class="form-control mb-2">
+    <input [(ngModel)]="model.lastName" name="lastName" placeholder="Apellido" required class="form-control mb-2">
+    <input [(ngModel)]="model.email" name="email" placeholder="Correo electrónico" type="email" required class="form-control mb-2">
+    <input [(ngModel)]="model.password" name="password" placeholder="Contraseña" type="password" required class="form-control mb-2">
+    <input [(ngModel)]="model.repeatPassword" name="repeatPassword" placeholder="Repetir Contraseña" type="password" required class="form-control mb-3">
 
-            <div class="mb-3">
-              <label for="email" class="form-label">Email</label>
-              <input
-                type="email"
-                class="form-control"
-                id="email"
-                formControlName="email"
-                [class.is-invalid]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
-                placeholder="tu@email.com"
-              >
-              <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['required']">
-                El email es requerido
-              </div>
-              <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['email']">
-                Formato de email inválido
-              </div>
-            </div>
+    <button type="submit" class="btn btn-success w-100">Registrar</button>
+  </form>
 
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="password" class="form-label">Contraseña</label>
-                  <input
-                    type="password"
-                    class="form-control"
-                    id="password"
-                    formControlName="password"
-                    [class.is-invalid]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched"
-                    placeholder="Mínimo 6 caracteres"
-                  >
-                  <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['required']">
-                    La contraseña es requerida
-                  </div>
-                  <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['minlength']">
-                    Mínimo 6 caracteres
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="repeatPassword" class="form-label">Repetir Contraseña</label>
-                  <input
-                    type="password"
-                    class="form-control"
-                    id="repeatPassword"
-                    formControlName="repeatPassword"
-                    [class.is-invalid]="registerForm.get('repeatPassword')?.invalid && registerForm.get('repeatPassword')?.touched"
-                    placeholder="Repite tu contraseña"
-                  >
-                  <div class="invalid-feedback" *ngIf="registerForm.get('repeatPassword')?.errors?.['required']">
-                    Debes repetir la contraseña
-                  </div>
-                  <div class="invalid-feedback" *ngIf="registerForm.get('repeatPassword')?.errors?.['passwordMismatch']">
-                    Las contraseñas no coinciden
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="d-grid gap-2">
-              <button
-                type="submit"
-                class="btn btn-primary"
-                [disabled]="registerForm.invalid || loading"
-              >
-                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
-                {{ loading ? 'Registrando...' : 'Registrarse' }}
-              </button>
-            </div>
-
-            <div class="text-center mt-3">
-              <a routerLink="/login" class="text-decoration-none">¿Ya tienes cuenta? Inicia Sesión</a>
-            </div>
-          </form>
-
-          <div *ngIf="errorMessage" class="alert alert-danger mt-3" role="alert">
-            {{ errorMessage }}
-          </div>
-
-          <div *ngIf="successMessage" class="alert alert-success mt-3" role="alert">
-            {{ successMessage }}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="mt-3 text-center">{{ message }}</div>
 </div>
+

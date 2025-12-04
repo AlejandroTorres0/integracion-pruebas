@@ -1,1 +1,42 @@
-<p>products works!</p>
+<div class="container mt-4">
+
+      <h1>Portal de Compras</h1>
+
+      <!-- Cartel de sesión -->
+      <div class="text-center mt-4" *ngIf="userName">
+        <div class="alert alert-info">
+          <h5>✅ Sesión activa como: {{ userName }}</h5>
+        </div>
+      </div>
+
+      <!-- Lista de productos -->
+      <app-products-list></app-products-list>
+
+      <!-- Mis compras -->
+      <div class="row mt-5">
+        <div class="col">
+          <h3>Mis Compras Anteriores</h3>
+          <button class="btn btn-outline-primary mb-3" (click)="loadCompras()">
+            🔄 Actualizar Compras
+          </button>
+          <div *ngIf="compras.length > 0">
+            <div class="card mb-3" *ngFor="let compra of compras">
+              <div class="card-body">
+                <h5 class="card-title">Compra #{{compra.id}}</h5>
+                <p class="card-text">Fecha: {{compra.fecha | date:'medium'}}</p>
+                <p class="card-text">
+                  Estado:
+                  <span [class]="getStatusClass(compra.estado)">{{compra.estado}}</span>
+                </p>
+                <p class="card-text">
+                  <strong>Total: {{compra.total}}</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="compras.length === 0 && !loadingCompras">
+            <p class="text-muted">No tienes compras registradas.</p>
+          </div>
+        </div>
+      </div>
+    </div>

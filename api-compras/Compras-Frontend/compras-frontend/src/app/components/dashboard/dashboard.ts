@@ -1,47 +1,66 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth';
+import { ApiService } from '../../services/api';
 
 @Component({
   selector: 'app-dashboard',
-  standalone: true,
-  imports: [CommonModule],
+  standalone: true,  // ← Agregar esto
+  imports: [CommonModule], // ← Agregar imports necesarios
   template: `
-    <div class="container mt-5">
-      <div class="row">
-        <div class="col-12">
-          <div class="card">
-            <div class="card-header bg-primary text-white">
-              <h3>Dashboard</h3>
-            </div>
-            <div class="card-body">
-              <h4>Bienvenido, {{ userEmail }}</h4>
-              <p>Has iniciado sesión exitosamente en el sistema de compras.</p>
-              <div class="mt-4">
-                <button class="btn btn-danger" (click)="logout()">Cerrar Sesión</button>
-              </div>
-            </div>
-          </div>
+    <div class="dashboard">
+      <h1>Bienvenido, {{ userName }}!</h1>
+      <p>Email: {{ userEmail }}</p>
+      
+      <button (click)="loadCompras()">Cargar mis compras</button>
+      
+      @if (compras.length > 0) {
+        <div>
+          <h3>Mis Compras:</h3>
+          <ul>
+            @for (compra of compras; track compra.id) {
+              <li>{{ compra.nombre }}</li>
+            }
+          </ul>
         </div>
-      </div>
+      }
     </div>
-  `
+  `,
+  styles: [`
+    .dashboard {
+      padding: 2rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  `]
 })
 export class DashboardComponent implements OnInit {
-  userEmail: string | null = '';
+  private authService = inject(AuthService);
+  private apiService = inject(ApiService);
+  
+  userName = '';
+  userEmail = '';
+  compras: any[] = [];
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) {}
-
-  ngOnInit(): void {
-    this.userEmail = this.authService.getCurrentUserEmail();
+  ngOnInit() {
+    this.userName = this.authService.getUserName();
+    //this.userEmail = this.authService.getEmail();
   }
 
-  logout(): void {
-    this.authService.logout();
-    this.router.navigate(['/login']);
-  }
+  loadCompras(): void {
+  this.apiService.getOrderHistory().subscribe({  // ← CAMBIAR getCompras por getOrderHistory
+    next: (compras: any) => {                    // ← Agregar tipo 'any'
+      this.compras = compras;
+    },
+    error: (error: any) => {                     // ← Agregar tipo 'any'
+      console.error('Error cargando compras:', error);
+    }
+  });
+}
 }
